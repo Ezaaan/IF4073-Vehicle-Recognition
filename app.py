@@ -8,10 +8,18 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+from skimage.morphology import disk, binary_opening, binary_closing, remove_small_objects
+from skimage.measure import label, regionprops
+from skimage.color import rgb2gray
+from skimage.util import invert
+from ultralytics import YOLO
 
 # Load the saved SVM model and label encoder
 svm_model = joblib.load('svm_model.pkl')
 label_encoder = joblib.load('svm_label_encoder.pkl')
+
+# Load the saved CNN model
+cnn_model = YOLO("./cnn_model.pt")
 
 # Placeholder for YOLO model loading (replace with your YOLO loading code if available)
 def load_yolo_model():
@@ -35,22 +43,47 @@ def predict_image(image_path):
         img = cv2.imread(image_path)
         img = cv2.resize(img, (128, 128))
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 100, 200)
-        features = edges.flatten().reshape(1, -1)
+        edges = cv2.Canny(gray, gray.mean() - gray.std(), gray.mean() + gray.std())  # Apply Canny edge detection
+
+        binarized_edges = edges > 0  # Binarize the edge-detected image
+        binarized_edges = remove_small_objects(binarized_edges, min_size=3)
+    
+        closed_edge = binary_closing(binarized_edges, disk(17))
+        filled_segment = cv2.morphologyEx(closed_edge.astype(np.uint8), cv2.MORPH_CLOSE, None)
+        
+        # Apply the mask to the image
+        if len(img.shape) == 3:
+            obj_img = img * filled_segment[:, :, np.newaxis]
+        else:
+            obj_img = img * filled_segment
+        
+        # Histogram of Oriented Gradients (HOG)
+        winSize = (64, 64)
+        blockSize = (16, 16)
+        blockStride = (8, 8)
+        cellSize = (8, 8)
+        nbins = 9
+        hog = cv2.HOGDescriptor(winSize, blockSize, blockStride, cellSize, nbins)
+        hog_features = [hog.compute(obj_img).flatten()]
 
         # Predict the class and confidence
-        predicted_class_index = svm_model.predict(features)[0]
-        confidence = np.max(svm_model.predict_proba(features))
+        predicted_class_index = svm_model.predict(hog_features)[0]
+        confidence = np.max(svm_model.predict_proba(hog_features))
         predicted_label = label_encoder.inverse_transform([predicted_class_index])[0]
 
         svmPredictionLabel.config(text=f"SVM Prediction: {predicted_label} ({confidence:.2f})", fg="green")
     except Exception as e:
+        print(e)
         svmPredictionLabel.config(text=f"SVM Error: {e}", fg="red")
 
     # YOLO Prediction
     try:
-        # Placeholder logic for YOLO predictions (replace with actual YOLO processing)
-        yoloPredictionLabel.config(text="YOLO Prediction: Coming soon!", fg="blue")
+        labels = ['Bus', 'Car', 'Motorcycle', 'Truck']
+        result = cnn_model(image_path)
+        predicted_label = labels[result[0].probs.top1]
+        confidence = result[0].probs.top1conf.item()
+
+        yoloPredictionLabel.config(text=f"YOLO Prediction: {predicted_label} ({confidence:.2f})", fg="blue")
     except Exception as e:
         yoloPredictionLabel.config(text=f"YOLO Error: {e}", fg="red")
 
