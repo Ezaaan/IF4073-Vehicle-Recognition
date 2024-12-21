@@ -66,7 +66,7 @@ def browseFiles():
         try:
             # Open the image using Pillow (PIL)
             img = Image.open(filename)
-            img = img.resize((400, 400))  # Resize image to fit the label
+            # img = img.resize((600, 600))  # Resize image to fit the label
             # Convert the image to a Tkinter-compatible format
             img_tk = ImageTk.PhotoImage(img)
 
@@ -89,7 +89,7 @@ headerLabel = Label(root, text="Vehicle Recognition System", font=("Arial", 24, 
 headerLabel.pack(pady=20)
 
 # Image display section
-imageLabel = Label(root, text="No Image Selected", width=50, height=25, bg="#ccc", fg="#666")
+imageLabel = Label(root, text="No Image Selected", bg="#ccc", fg="#666")
 imageLabel.pack(pady=20)
 
 # Prediction labels
