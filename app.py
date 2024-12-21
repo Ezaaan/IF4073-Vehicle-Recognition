@@ -100,6 +100,7 @@ def browseFiles():
             # Open the image using Pillow (PIL)
             img = Image.open(filename)
             # img = img.resize((600, 600))  # Resize image to fit the label
+            img.thumbnail((600, 600))
             # Convert the image to a Tkinter-compatible format
             img_tk = ImageTk.PhotoImage(img)
 
